@@ -1,0 +1,361 @@
+#include "Generator.hpp"
+
+Generator::Generator() {
+    this->register_free_t = 0;
+    this->register_free_f = 0;
+    this->register_lock_t = false;
+    this->register_lock_f = false;
+}
+
+Generator::~Generator() {
+
+}
+
+void Generator::set_type_table(TypeTable* type_table) {
+    this->type_table = type_table;
+}
+
+void Generator::lock_registers(Expression expression) {
+    if (get_precision(expression) == P_WORD) this->register_lock_t = true;
+    if (get_precision(expression) == P_SINGLE) this->register_lock_f = true;
+    if (get_precision(expression) == P_DOUBLE) this->register_lock_f = true;
+    else error("Error en generacion de codigo");
+}
+
+void Generator::reserve_register(Expression expression) {
+    if (get_precision(expression) == P_WORD) this->register_free_t += 1;
+    if (get_precision(expression) == P_SINGLE) this->register_free_f += 1;
+    if (get_precision(expression) == P_DOUBLE) this->register_free_f += 2;
+    else error("Error en generacion de codigo");
+}
+
+void Generator::unlock_registers() {
+    this->register_lock_t = false;
+    this->register_lock_f = false;
+}
+
+void Generator::unreserve_registers() {
+    this->register_free_t = 0;
+    this->register_free_f = 0;
+}
+
+std::string Generator::get_syscall_register(Expression expression) {
+    if (get_precision(expression) == P_WORD) return "$v0";
+    if (get_precision(expression) == P_SINGLE) return "$f0";
+    if (get_precision(expression) == P_DOUBLE) return "$f0";
+    else error("Error en generacion de codigo");   
+}
+
+std::string Generator::get_register_reserved(Expression expression) {
+    std::string str = get_register_unreserved(expression);
+    lock_registers(expression);
+    reserve_register(expression);
+    return str;
+}
+
+std::string Generator::get_register_unreserved(Expression expression) {
+    std::string str = "";
+    if (get_precision(expression) == P_WORD) str += ("$t" + this->register_free_t);
+    else if (get_precision(expression) == P_SINGLE) str += ("$f" + this->register_free_f);
+    else if (get_precision(expression) == P_DOUBLE) str += ("$f" + this->register_free_f);
+    else error("Error en generacion de codigo");
+    return str;
+}
+
+std::string Generator::get_address(Expression expression) {
+    // absolute or relative to stack pointer
+    std::string alias = expression.get_alias();
+    if (local_table->has_symbol_with_id(alias)) return std::to_string(local_table->get_symbol_by_id(alias).get_address()) + "($sp)"; 
+    else return alias;
+}
+
+std::string Generator::get_mnemonic(Expression expression, InstructionType type) {
+    switch (type) {
+        case I_LOAD:
+            if (get_precision(expression) == P_WORD && !expression.get_is_immediate()) return "lw";
+            if (get_precision(expression) == P_WORD  && expression.get_is_immediate()) return "li";
+            if (get_precision(expression) == P_SINGLE) return "l.s";
+            if (get_precision(expression) == P_DOUBLE) return "l.d";
+        case I_STORE:
+            if (get_precision(expression) == P_WORD) return "sw";
+            if (get_precision(expression) == P_SINGLE) return "s.s";
+            if (get_precision(expression) == P_DOUBLE) return "s.d";
+        case I_CONVERT_TO_WORD:
+            if (get_precision(expression) == P_SINGLE) return "cvt.w.s";
+            if (get_precision(expression) == P_DOUBLE) return "cvt.w.d";
+        case I_CONVERT_TO_SINGLE:
+            if (get_precision(expression) == P_WORD) return "cvt.s.w";
+            if (get_precision(expression) == P_DOUBLE) return "cvt.s.d";
+        case I_CONVERT_TO_DOUBLE:
+            if (get_precision(expression) == P_WORD) return "cvt.d.w";
+            if (get_precision(expression) == P_SINGLE) return "ctw.d.s";
+        case I_LOAD_WRITE:
+            if (get_precision(expression) == P_WORD) return "la";
+            if (get_precision(expression) == P_SINGLE) return "l.s";
+            if (get_precision(expression) == P_DOUBLE) return "l.d";
+            if (get_precision(expression) == P_STRING) return "la";
+        case I_ADD:
+            if (get_precision(expression) == P_WORD) return "add";
+            if (get_precision(expression) == P_SINGLE) return "add.s";
+            if (get_precision(expression) == P_DOUBLE) return "add.d";
+        case I_SUBSTRACT:
+            if (get_precision(expression) == P_WORD) return "sub";
+            if (get_precision(expression) == P_SINGLE) return "sub.s";
+            if (get_precision(expression) == P_DOUBLE) return "sub.d";
+        case I_MULTIPLY:
+            if (get_precision(expression) == P_WORD) return "mul";
+            if (get_precision(expression) == P_SINGLE) return "mul.s";
+            if (get_precision(expression) == P_DOUBLE) return "mul.d";
+        case I_DIVIDE:
+            if (get_precision(expression) == P_WORD) return "div";
+            if (get_precision(expression) == P_SINGLE) return "div.s";
+            if (get_precision(expression) == P_DOUBLE) return "div.d";
+    }
+}
+
+std::string Generator::get_argument(Expression expression, InstructionType type) {
+    switch (type) {
+        case I_READ:
+            if (get_precision(expression) == P_WORD) return "1";
+            if (get_precision(expression) == P_SINGLE) return "2";
+            if (get_precision(expression) == P_DOUBLE) return "3";
+            if (get_precision(expression) == P_STRING) return "4";
+        case I_WRITE:
+            if (get_precision(expression) == P_WORD) return "5";
+            if (get_precision(expression) == P_SINGLE) return "6";
+            if (get_precision(expression) == P_DOUBLE) return "7";
+            if (get_precision(expression) == P_STRING) return "8";
+    }
+}
+
+int Generator::get_precision(Expression expression) {
+    if (expression.get_type() == type_table->get_type_by_name("char").get_id()) return P_WORD;
+    if (expression.get_type() == type_table->get_type_by_name("int").get_id()) return P_WORD;
+    if (expression.get_type() == type_table->get_type_by_name("float").get_id()) return P_SINGLE;
+    if (expression.get_type() == type_table->get_type_by_name("double").get_id()) return P_DOUBLE; 
+    if (expression.get_type() == type_table->get_type_by_name("string").get_id()) return P_STRING; 
+    else error("Error en generacion de codigo");   
+}
+
+void Generator::translate_global_table(SymbolTable global_table) {
+    for (Symbol symbol : global_table.get_symbols()) {
+        Constant data(symbol.get_type(), symbol.get_id(), 0);
+        program_data.push_back(data);
+    }
+}
+
+void Generator::translate_constants_table(std::map<std::string, Constant> constants_table) {
+    for (auto const& [id, data] : constants_table) {
+        program_data.push_back(data);
+    }
+}
+
+void Generator::translate_code(std::vector<Quad> code, SymbolTable local_table) {
+    for (Quad quad : code) {
+        QuadType quad_type = quad_resolver.resolve_type(quad);
+        if (quad_type == Q_IF) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_unreserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2("bne", {instruction_1.get_arguments()[0], "$zero", get_address(quad.get_operator_2())});
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2});
+        }
+        else if (quad_type == Q_GOTO) {
+            Instruction instruction_1("j", {get_address(quad.get_operator_1())});
+            this->program_text.insert(this->program_text.end(), {instruction_1});
+        }
+        else if (quad_type == Q_LABEL) {
+            Instruction instruction_1("", {get_address(quad.get_operator_1())});
+            this->program_text.insert(this->program_text.end(), {instruction_1});
+        }
+        else if (quad_type == Q_ASSIGN) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_unreserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_result(), I_STORE), {instruction_1.get_arguments()[0], get_address(quad.get_result())});
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2});
+        }
+        else if (quad_type == Q_SCAN) {
+            Instruction instruction_1("li", {"$v0", get_argument(quad.get_operator_1(), I_READ)});     
+            Instruction instruction_2("syscall", {});
+            Instruction instruction_3(get_mnemonic(quad.get_operator_1(), I_STORE), {get_syscall_register(quad.get_operator_1()), get_address(quad.get_operator_1())});     
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2});
+
+        }
+        else if (quad_type == Q_PRINT) {
+            Instruction instruction_1("li", {"$v0", get_argument(quad.get_operator_1(), I_WRITE)});     
+            Instruction instruction_3(get_mnemonic(quad.get_operator_1(), I_LOAD_WRITE), {get_syscall_register(quad.get_operator_1()), get_address(quad.get_operator_1())});     
+            Instruction instruction_2("syscall", {});
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2});
+        }
+        else if (quad_type == Q_PARAM) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            this->program_text.insert(this->program_text.end(), {instruction_1});
+        }
+        else if (quad_type == Q_CALL) {
+            unlock_registers();
+            unreserve_registers();
+            // ..........
+        }
+        else if (quad_type == Q_RETURN_VALUE) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_unreserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_1(), I_STORE), {instruction_1.get_arguments()[0], get_address(quad.get_result())});
+            Instruction instruction_3("jr", {"$ra"});           
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3});
+        }
+        else if (quad_type == Q_RETURN_VALUE) {
+            Instruction instruction_1("jr", {"$ra"});           
+            this->program_text.insert(this->program_text.end(), {instruction_1});
+        }
+        /****/
+        else if (quad_type == Q_CAST_TO_CHAR) {
+            
+        }
+        else if (quad_type == Q_CAST_TO_INTEGER) {
+            
+        }
+        else if (quad_type == Q_CAST_TO_FLOAT) {
+            
+        }
+        else if (quad_type == Q_CAST_TO_DOUBLE) {
+            
+        }
+        /****/
+        else if (quad_type == Q_DISJOIN) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3("or", {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4("slt", {get_register_reserved(quad.get_result()), "$zero", instruction_3.get_arguments()[0]});
+            Instruction instruction_5(get_mnemonic(quad.get_result(), I_STORE), {instruction_4.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4, instruction_5});
+        }
+        else if (quad_type == Q_CONJOIN) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3("and", {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4("slt", {get_register_reserved(quad.get_result()), "$zero", instruction_3.get_arguments()[0]});
+            Instruction instruction_5(get_mnemonic(quad.get_result(), I_STORE), {instruction_4.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4, instruction_5});
+        }
+        else if (quad_type == Q_EQUAL) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3("xor", {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4("seq", {get_register_reserved(quad.get_result()), "$zero", instruction_3.get_arguments()[0]});
+            Instruction instruction_5(get_mnemonic(quad.get_result(), I_STORE), {instruction_4.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4, instruction_5});
+        }
+        else if (quad_type == Q_NOT_EQUAL) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3("xor", {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4("sne", {get_register_reserved(quad.get_result()), "$zero", instruction_3.get_arguments()[0]});
+            Instruction instruction_5(get_mnemonic(quad.get_result(), I_STORE), {instruction_4.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4, instruction_5});
+        }
+        else if (quad_type == Q_NOT_EQUAL) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3("xor", {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4("sne", {get_register_reserved(quad.get_result()), "$zero", instruction_3.get_arguments()[0]});
+            Instruction instruction_5(get_mnemonic(quad.get_result(), I_STORE), {instruction_4.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4, instruction_5});
+        }
+        else if (quad_type == Q_LESS) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3("sub", {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4("slt", {get_register_reserved(quad.get_result()), instruction_3.get_arguments()[0], "$zero"});
+            Instruction instruction_5(get_mnemonic(quad.get_result(), I_STORE), {instruction_4.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4, instruction_5});
+        }
+        else if (quad_type == Q_GREATER) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3("sub", {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4("sgt", {get_register_reserved(quad.get_result()), instruction_3.get_arguments()[0], "$zero"});
+            Instruction instruction_5(get_mnemonic(quad.get_result(), I_STORE), {instruction_4.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4, instruction_5});
+        }
+        else if (quad_type == Q_LESS_EQUAL) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3("sub", {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4("sle", {get_register_reserved(quad.get_result()), instruction_3.get_arguments()[0], "$zero"});
+            Instruction instruction_5(get_mnemonic(quad.get_result(), I_STORE), {instruction_4.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4, instruction_5});
+        }
+        else if (quad_type == Q_GREATER_EQUAL) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3("sub", {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4("sge", {get_register_reserved(quad.get_result()), instruction_3.get_arguments()[0], "$zero"});
+            Instruction instruction_5(get_mnemonic(quad.get_result(), I_STORE), {instruction_4.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4, instruction_5});
+        }
+        else if (quad_type == Q_ADD) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3(get_mnemonic(quad.get_result(), I_ADD), {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4(get_mnemonic(quad.get_result(), I_STORE), {instruction_3.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4});
+        }
+        else if (quad_type == Q_SUBSTRACT) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3(get_mnemonic(quad.get_result(), I_SUBSTRACT), {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4(get_mnemonic(quad.get_result(), I_STORE), {instruction_3.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4});
+        }
+        else if (quad_type == Q_MULTIPLY) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3(get_mnemonic(quad.get_result(), I_MULTIPLY), {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4(get_mnemonic(quad.get_result(), I_STORE), {instruction_3.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4});
+        }
+        else if (quad_type == Q_DIVIDE) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2(get_mnemonic(quad.get_operator_2(), I_LOAD), {get_register_reserved(quad.get_operator_2()), get_address(quad.get_operator_2())});
+            Instruction instruction_3(get_mnemonic(quad.get_result(), I_DIVIDE), {get_register_reserved(quad.get_result()), instruction_1.get_arguments()[0], instruction_2.get_arguments()[0]});
+            Instruction instruction_4(get_mnemonic(quad.get_result(), I_STORE), {instruction_3.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3, instruction_4});
+        }
+        else if (quad_type == Q_NEGATE) {
+            Instruction instruction_1(get_mnemonic(quad.get_operator_1(), I_LOAD), {get_register_reserved(quad.get_operator_1()), get_address(quad.get_operator_1())});
+            Instruction instruction_2("seq", {get_register_reserved(quad.get_result()), "$zero", instruction_1.get_arguments()[0]});
+            Instruction instruction_3(get_mnemonic(quad.get_result(), I_STORE), {instruction_2.get_arguments()[0], get_address(quad.get_result())});
+            unlock_registers();
+            unreserve_registers();
+            this->program_text.insert(this->program_text.end(), {instruction_1, instruction_2, instruction_3});
+        }
+        else error("Error en generacion de codigo");
+    }
+}
+
+void Generator::error(std::string message) {
+    std::cout << message << std::endl;
+    throw std::exception();
+}
