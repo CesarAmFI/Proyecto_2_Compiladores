@@ -1,0 +1,7 @@
+void main() {
+    int n, m;
+    scan(n);
+    m = n + 10;
+    print("El numero que ingresaste mas 10 es: ");
+    print(m);
+}
