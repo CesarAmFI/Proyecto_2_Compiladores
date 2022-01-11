@@ -1,0 +1,271 @@
+if (1) {
+    a = 1;
+}
+a = 2;
+
+-------------------
+
+    if (1) {
+L0:     a = 1;
+    }
+L1: a = 2;
+
+-------------------
+
+    if 1 goto L0
+    goto L1
+L0: a = 1
+    goto L1
+L1: a = 2
+
+-------------------
+
+if (1) {
+    a = 1;
+}
+else {
+    a = 3;
+}
+a = 2;
+
+-------------------
+
+    if (1) {
+L0:     a = 1;
+    }
+    else {
+L1:     a = 3;
+    }
+L2: a = 2;
+
+-------------------
+
+    if 1 goto L0
+    goto L1
+L0: a = 1
+    goto L2
+L1: a = 3
+    goto L2
+L2: a = 2
+
+--------------------
+
+while (1) {
+    a = 1;
+}
+a = 2;
+
+-------------------
+
+L0: while (1) {
+L1:     a = 1;
+        b = 2;
+    }
+L2: a = 2
+
+-------------------
+
+L0: if 1 goto L1
+    goto L2
+L1: a = 1
+    b = 2
+    goto L0
+L2: a = 2
+
+--------------------
+
+do {
+    a = 1;
+} while (1);
+a = 2;
+
+-------------------
+
+    do {
+L0:     a = 1;
+        b = 2;
+    } while (1);
+    a = 2;
+
+-------------------
+
+L0: a = 1
+    b = 2
+    if 1 goto L0
+    a = 2
+
+-------------------
+
+while (a < 10) {
+    a = a + 1;
+    if (a > 5) {
+        end = 1;
+        break;
+    }
+    b = 10;
+}
+c = 2;
+
+-------------------
+
+L0: a < 10 goto L1
+    goto L2
+L1: t0 = a + 1
+    a = t0
+    if a > 5 goto L3
+    goto L4
+L3: end = 1
+    goto L2 // break (meter a la pila, falso de while)
+L4: b = 10
+    goto L0
+L2: c = 2
+
+-------------------
+
+do {
+    a = a + 1;
+    if (a > 5) {
+        end = 1;
+        break;
+    }
+    b = 10;
+} while (a < 10);
+c = 2;
+
+-------------------
+
+L0: t0 = a + 1
+    a = t0
+    if a > 5 goto L2
+    goto L3
+L2: end = 1
+    goto L1
+L3: b = 10
+    if a < 10 goto L0
+    goto L1
+L1: c = 2
+
+-------------------
+
+do {
+    while (c < 10) {
+        b = b + 1;
+    }
+    while (b < 10) {
+        b = b + 1;
+        if (c = 5) {
+            break;
+        }
+    }
+    a = a + 1;
+    if (a > 5) {
+        end = 1;
+        break;
+    }
+    b = 10;
+} while (a < 10);
+c = 2;
+
+-------------------
+
+L0: t0 = a + 1
+    a = t0
+    if a > 5 goto L2
+    goto L3
+L2: end = 1
+    goto L1
+L3: b = 10
+    if a < 10 goto L0
+    goto L1
+L1: c = 2
+
+--------------------
+
+int v;
+
+void fn() {
+    v = 1;
+}
+
+--------------------
+
+L0: v = 1
+
+--------------------
+
+li $t0, 1
+sw $t0, 0($sp)
+
+--------------------
+
+char c;
+int i;
+i = 1435345345;
+c = i;
+
+--------------------
+
+i = 5125 = 0b 0000 ... 0001 0100 0000 0101
+c = (char) i = 0b 0000 0101
+
+--------------------
+
+float a;
+int k;
+a = 8.90;
+k = 8;
+
+if (a && k) {
+
+}
+
+--------------------
+
+a = 8.90
+k = 8
+t1 = (int) a
+t2 = t1 && k
+t3 = float (t2)
+if t2 goto L1
+goto 
+
+--------------------
+
+struct A {
+    int a;
+    float b;
+} a_1;
+
+struct B {
+    float x;
+    int y;
+} b_1;
+
+struct B func_1() {
+    return a_1;
+}
+
+--------------------
+
+// t de tipo B
+1. generate_return -> generate_assignement (expression from temporal)
+t[0] = a_1[4] 
+t[4] = a_1[0]
+returning t[0] (expression from structure variable for each)
+returning t[4]
+return 
+
+---------------------
+
+int func() {
+    int a;
+    a = 5;
+    return a;
+}
+
+
+
+
+
+
+

@@ -1,0 +1,23 @@
+struct Fecha {
+    int anio;
+    int mes;
+    int dia;
+} hoy, nacimiento;
+
+void main() {
+    int edad;
+    hoy.anio = 2021;
+    hoy.mes = 12;
+    hoy.dia = 22;
+    nacimiento.anio = 1999;
+    nacimiento.mes = 9;
+    nacimiento.dia = 9;
+    if (nacimiento.mes > hoy.mes || nacimiento.mes == hoy.mes && nacimiento.dia > hoy.dia) {
+        edad = hoy.anio - nacimiento.anio - 1;
+    }
+    else {
+        edad = hoy.anio - nacimiento.anio;
+    }
+    print("Tu edad es:");
+    print(edad);
+}

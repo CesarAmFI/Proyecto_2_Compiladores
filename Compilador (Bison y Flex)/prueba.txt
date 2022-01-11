@@ -1,0 +1,121 @@
+int a;
+
+struct B {
+    float a;
+    int b;
+} b_1, b_2;
+
+struct {
+    int x;
+    float y;
+} z_1, z_2;
+
+struct C {
+    float a;
+    int b;
+    int c;
+} c_1, c_2;
+
+int main() {
+    int e, f;
+    e = 8;
+    if (e > 3) {
+        f = 6;
+    }
+    scan(e);
+    print("Hola");
+    print("Caca");
+    print(e);
+    return 0;
+}
+
+void funcion_2(int numero, int a_sumar) {
+    float a;
+    int suma;
+    suma = numero + a_sumar;
+    print("El numero mas tres es: \n");
+    print(suma);
+}
+
+struct B funcion_3(int numero) {
+    int a;
+    a = 10;
+    if (numero > 10) {
+        b_1.a = numero;
+        b_1.b = numero;
+    } else {
+        b_1.a = 10;
+        b_1.b = numero;
+    }
+    return b_1;
+}
+
+struct B funcion_4() {
+    b_1 = z_1;
+    b_2 = b_1;
+    return b_1;
+}
+
+int mayor(int a, int b) {
+    if (a > b) return 1;
+    else return 0;
+}
+
+int aumentar(int num, int max, int limit) {
+    int cont;
+    cont = 0;
+    while (cont < max) {
+        if (cont < limit) {
+            break;
+        }
+        cont = cont + 1;
+        num = num + 1;
+    }
+    return cont;
+}
+
+int factorial(int n) {
+    int fact, a;
+    a = n;
+    fact = 1;
+    while (a > 1) {
+        fact = fact * a;
+        a = a - 1;
+    }
+    return fact;
+}
+
+void imprimir_factorial(int n) {
+    float fact;
+    fact = factorial(n);
+    print("El factorial es\n");
+    print(fact);
+}
+
+int caca() {
+    int a;
+    float b;
+    a = 3;
+    b = a;
+    return b;
+}
+
+int amiga_mia(int a, double b, char c) {
+    float z;
+    return 0;
+}
+
+void amigo_mio() {
+    int k;
+    float n;
+    n = k + 1;
+    n = amiga_mia(5, 10, 30);
+}
+
+void final() {
+    return;
+}
+
+void funfun() {
+    z_1 = funcion_3(2);
+}
