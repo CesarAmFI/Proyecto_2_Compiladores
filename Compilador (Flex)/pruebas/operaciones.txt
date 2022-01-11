@@ -1,0 +1,4 @@
+void main() {
+    int numero;
+    numero = 100 - 5 * 12 - 4 + 10 / 5;
+}
