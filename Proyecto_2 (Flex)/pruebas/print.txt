@@ -1,6 +1,0 @@
-void main() {
-    int n;
-    n = 10;
-    print("El numero 10 es: ");
-    print(n);
-}
